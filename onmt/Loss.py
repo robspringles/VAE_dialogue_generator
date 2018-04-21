@@ -214,7 +214,7 @@ class NMTLossCompute(LossComputeBase):
 
         kl = (torch.exp(app_logvar) + (app_mu - true_mu)**2)/torch.exp(true_logvar) - 1 + true_logvar - app_logvar
         kl_loss = torch.mean(0.5 * torch.sum(kl, 1))
-        loss += 0.01 * kl_loss
+        loss += 100 * kl_loss
 
         if self.confidence < 1:
             loss_data = - likelihood.sum(0)
