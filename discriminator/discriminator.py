@@ -24,21 +24,27 @@ parser.add_argument('--save', default=False, action='store_true',
                     help='whether to save model or not')
 parser.add_argument('--mbsize', type=int, default=1024,
                     help='batch size')
-parser.add_argument('--h_dim', type=int, default=128,
+parser.add_argument('--h_dim', type=int, default=64,
                     help='model size')
-parser.add_argument('--lr', type=float, default=1e-2,
+parser.add_argument('--lr', type=float, default=1e-4,
                     help='learning rate')
 parser.add_argument('--lr_decay', type=float, default=0.9,
                     help='learning rate decay')
-parser.add_argument('--n_iter', type=int, default=30000,
+parser.add_argument('--n_iter', type=int, default=200000,
                     help='data_size * epoch_size / mbsize')
-parser.add_argument('--log_interval', type=int, default=200,
+parser.add_argument('--n_iter_dev', type=int, default=10,
+                    help='data_size * epoch_size / mbsize')
+parser.add_argument('--log_interval', type=int, default=100,
                     help='number of epoches to report')
-parser.add_argument('--save_interval', type=int, default=3000,
+parser.add_argument('--save_interval', type=int, default=100,
                     help='number of epoches to save a new model')
 parser.add_argument('--c_dim', type=int, default=2,
                     help='dim of c')
 parser.add_argument('--model_path', type=str, default='./models',
+                    help='where to save the model')
+parser.add_argument('--checkpoint', type=str, default='./models/disc.bin',
+                    help='model checkpoint to use')
+parser.add_argument('--test', default=False, action='store_true',
                     help='where to save the model')
 args = parser.parse_args()
 
@@ -57,6 +63,30 @@ print ("Initiating model...")
 model = RNN_VAE(dataset.n_vocab, args.h_dim, args.c_dim, p_word_dropout=0.3, gpu=args.gpu)
 print ("Model initiated")
 
+def test(model):
+    # Forward proprgation
+    num_dev = 0
+    acc_dev = 0.0
+    for i in range(0, args.n_iter_dev):
+        inputs, labels = dataset.next_batch(args.gpu, tag = "dev")
+        y_disc_real = model.forward_discriminator(inputs.transpose(0, 1))
+	_, est_labels = torch.topk(y_disc_real, 1, dim=1)
+	nonzero = torch.nonzero(torch.abs(est_labels.view(-1) - labels))
+	wrong = 0 if len(nonzero.size()) == 0 else nonzero.size(0)
+	acc_dev += labels.size()[0] - wrong
+	num_dev += labels.size()[0]
+    num = 0
+    acc = 0.0
+    for i in range(0, args.n_iter_dev):
+        inputs, labels = dataset.next_batch(args.gpu)
+        y_disc_real = model.forward_discriminator(inputs.transpose(0, 1))
+	_, est_labels = torch.topk(y_disc_real, 1, dim=1)
+	nonzero = torch.nonzero(torch.abs(est_labels.view(-1) - labels))
+	wrong = 0 if len(nonzero.size()) == 0 else nonzero.size(0)
+	acc += labels.size()[0] - wrong
+	num += labels.size()[0]
+    return acc_dev/num_dev, acc/num
+
 def main():
     trainer_D = optim.Adam(model.discriminator_params, lr=args.lr)
 
@@ -66,7 +96,6 @@ def main():
 
     for it in tqdm(range(args.n_iter)):
         inputs, labels = dataset.next_batch(args.gpu)
-        batch_size = inputs.size(1)
 
 	# Forward proprgation
         y_disc_real = model.forward_discriminator(inputs.transpose(0, 1))
@@ -82,7 +111,8 @@ def main():
 
 	# Log
         if it != 0 and it % args.log_interval == 0:
-            print('Iter-{}; loss_D: {:.4f}; lr: {:.6f}'.format(it, float(loss_D), args.lr))
+	    acc_dev, acc_train = test(model)
+            print('Iter-{}; loss_D: {:.4f}; lr: {:.6f}; acc_dev: {:.4f}; acc_train: {:.4f}'.format(it, float(loss_D), args.lr, acc_dev, acc_train))
 	    if float(loss_D) >= last_highest_loss:
 	        same_lr_iter += 1
 	    else:
@@ -101,8 +131,15 @@ def main():
 def save_model(model_name):
     if not os.path.exists(args.model_path):
         os.makedirs()
-    torch.save(model.state_dict(), os.path.join(args.model_path, model_name))
-
+    #torch.save(model.state_dict(), os.path.join(args.model_path, model_name))
+    torch.save(model, os.path.join(args.model_path, model_name))
 
 if __name__ == '__main__':
-    main()
+    if args.test:
+        with open(args.checkpoint, 'rb') as f:
+            test_model = torch.load(f)
+	    acc_dev, acc_train = test(test_model)    
+	    print "acc_dev: ", acc_dev
+	    print "acc_train: ", acc_train
+    else:
+        main()

@@ -122,8 +122,11 @@ class CLS_Dataset:
     def get_vocab_vectors(self):
         return self.text_field.vocab.vectors
 
-    def next_batch(self, gpu=False):
-        batch = next(self.train_iter)
+    def next_batch(self, gpu=False, tag="train"):
+	if tag == "dev":
+            batch = next(self.val_iter)
+	else:
+            batch = next(self.train_iter)
 
         if gpu:
             return batch.text.cuda(), batch.label.cuda()
