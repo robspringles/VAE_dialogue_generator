@@ -34,9 +34,9 @@ parser.add_argument('--n_iter', type=int, default=200000,
                     help='data_size * epoch_size / mbsize')
 parser.add_argument('--n_iter_dev', type=int, default=10,
                     help='data_size * epoch_size / mbsize')
-parser.add_argument('--log_interval', type=int, default=100,
+parser.add_argument('--log_interval', type=int, default=1000,
                     help='number of epoches to report')
-parser.add_argument('--save_interval', type=int, default=100,
+parser.add_argument('--save_interval', type=int, default=5000,
                     help='number of epoches to save a new model')
 parser.add_argument('--c_dim', type=int, default=2,
                     help='dim of c')
@@ -131,7 +131,6 @@ def main():
 def save_model(model_name):
     if not os.path.exists(args.model_path):
         os.makedirs()
-    #torch.save(model.state_dict(), os.path.join(args.model_path, model_name))
     torch.save(model, os.path.join(args.model_path, model_name))
 
 if __name__ == '__main__':
