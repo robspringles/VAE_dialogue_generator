@@ -245,28 +245,16 @@ def make_latent_variable_LSTM(model_opt, fields, gpu, checkpoint=None):
                                      feature_dicts)
     encoder = make_encoder(model_opt, src_embeddings)
 
-    # Latent variable-approximate distribution-mu
-    src_embeddings_approx_mu = make_embeddings(model_opt, src_dict,
-                                     feature_dicts, for_vae=True)
-    enc_approx_mu = make_encoder(model_opt, src_embeddings_approx_mu, for_vae=True)
+    # Latent variable-approximate distribution-mu/distribution-logvar
+    src_embeddings_approx = make_embeddings(model_opt, src_dict, feature_dicts, for_vae=True)
+    enc_approx = make_encoder(model_opt, src_embeddings_approx, for_vae=True)
     approx_mu = nn.Linear(model_opt.rnn_size_vae, model_opt.size_vae)
-
-    # Latent variable-approximate distribution-logvar
-    src_embeddings_approx_logvar = make_embeddings(model_opt, src_dict,
-                                     feature_dicts, for_vae=True)
-    enc_approx_logvar = make_encoder(model_opt, src_embeddings_approx_logvar, for_vae=True)
     approx_logvar = nn.Linear(model_opt.rnn_size_vae, model_opt.size_vae)
 
-    # Latent variable-true posterior-mu
-    src_embeddings_true_mu = make_embeddings(model_opt, src_dict,
-                                     feature_dicts, for_vae=True)
-    enc_true_mu = make_encoder(model_opt, src_embeddings_true_mu, for_vae=True)
+    # Latent variable-true posterior-mu/posterior-logvar
+    src_embeddings_true = make_embeddings(model_opt, src_dict, feature_dicts, for_vae=True)
+    enc_true = make_encoder(model_opt, src_embeddings_true, for_vae=True)
     true_mu = nn.Linear(model_opt.rnn_size_vae, model_opt.size_vae)
-
-    # Latent variable-true posterior-logvar
-    src_embeddings_true_logvar = make_embeddings(model_opt, src_dict,
-                                     feature_dicts, for_vae=True)
-    enc_true_logvar = make_encoder(model_opt, src_embeddings_true_logvar, for_vae=True)
     true_logvar = nn.Linear(model_opt.rnn_size_vae, model_opt.size_vae)
 
     # For AVE-GlobalMemory
@@ -291,10 +279,8 @@ def make_latent_variable_LSTM(model_opt, fields, gpu, checkpoint=None):
 
     # Make NMTModel(= encoder + decoder).
     model = LatentVaraibleModel(encoder, decoder, 
-                enc_approx_mu, approx_mu,
-                enc_approx_logvar, approx_logvar,
-                enc_true_mu, true_mu,
-                enc_true_logvar, true_logvar, glb, gpu)
+                enc_approx, approx_mu, approx_logvar,
+                enc_true, true_mu, true_logvar, glb, gpu)
     model.model_type = model_opt.model_type
 
     # Make Generator.

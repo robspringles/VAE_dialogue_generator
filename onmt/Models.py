@@ -633,23 +633,22 @@ class LatentVaraibleModel(nn.Module):
       multi<gpu (bool): setup for multigpu support
     """
     def __init__(self, encoder, decoder, \
-                enc_approx_mu, approx_mu,\
-                enc_approx_logvar, approx_logvar, \
-                enc_true_mu, true_mu, \
-                enc_true_logvar, true_logvar, glb, cuda,\
-                multigpu=False):
+                enc_approx, approx_mu, approx_logvar, \
+                enc_true, true_mu, true_logvar, \
+		glb, cuda, multigpu=False):
         self.multigpu = multigpu
         super(LatentVaraibleModel, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
-        self.enc_approx_mu = enc_approx_mu
+
+        self.enc_approx = enc_approx
         self.approx_mu = approx_mu
-        self.enc_approx_logvar = enc_approx_logvar
         self.approx_logvar = approx_logvar
-        self.enc_true_mu = enc_true_mu
+
+        self.enc_true = enc_true
         self.true_mu = true_mu
-        self.enc_true_logvar = enc_true_logvar
         self.true_logvar = true_logvar
+
         self.glb_linear = glb
         self.is_cuda = cuda
         self.tt = torch.cuda if cuda else torch
@@ -663,10 +662,8 @@ class LatentVaraibleModel(nn.Module):
                     lengths[j]+=1
         return lengths
 
-    def get_distribution(self, tgt, src, lengths, encoder, liner, is_true=False):
-        hiddens, _ = encoder(src, lengths)
-        if is_true:
-            return [liner(hiddens[i]) for i in range(0, len(hiddens))]
+    def encode_context_response(self, tgt, src, lengths, encoder):
+	hiddens, _ = encoder(src, lengths)
         # Sort tgt for encoding according to length
         tgt_lens = self.get_length(tgt)
         lens_sorted, id_sorted = tgt_lens.topk(tgt_lens.size()[0])
@@ -688,7 +685,7 @@ class LatentVaraibleModel(nn.Module):
             item_sorted = []
             for item in layer:
                 item_sorted.append(torch.cat([item[id] for id in id_sorted_rvs]))
-            hiddens_ret.append(liner(torch.cat(item_sorted).view(layer.size()[0], layer.size()[1], -1)))
+            hiddens_ret.append(torch.cat(item_sorted).view(layer.size()[0], layer.size()[1], -1))
         return hiddens_ret
 
     def sampling(self, mu, logvar):
@@ -702,23 +699,21 @@ class LatentVaraibleModel(nn.Module):
         return samples
 
     def get_latent_variable(self, tgt, src, lengths):
-        app_mu_dist = self.get_distribution(tgt, src, lengths, self.enc_approx_mu, self.approx_mu, is_true=False)
-        app_logvar_dist = self.get_distribution(tgt, src, lengths, self.enc_approx_logvar, self.approx_logvar, is_true=False)
+        hiddens_approx = self.encode_context_response(tgt, src, lengths, self.enc_approx)
+        app_mu_dist = [self.approx_mu(hiddens_approx[i]) for i in range(0, len(hiddens_approx))]
+        app_logvar_dist = [self.approx_logvar(hiddens_approx[i]) for i in range(0, len(hiddens_approx))]
         z_app = self.sampling(app_mu_dist, app_logvar_dist)
         
-        true_mu_dist = self.get_distribution(tgt, src, lengths, self.enc_true_mu, self.true_mu, is_true=True)
-        true_logvar_dist = self.get_distribution(tgt, src, lengths, self.enc_true_logvar, self.true_logvar, is_true=True)
+        hiddens_true, _ = self.enc_true(src, lengths)
+        true_mu_dist = [self.true_mu(hiddens_true[i]) for i in range(0, len(hiddens_true))]
+        true_logvar_dist = [self.true_logvar(hiddens_true[i]) for i in range(0, len(hiddens_true))]
         z_true = self.sampling(true_mu_dist, true_logvar_dist)
         return z_app, z_true, app_mu_dist, app_logvar_dist, true_mu_dist, true_logvar_dist
 
     def get_latent_variable_test(self, src, lengths):
-
-        hiddens_mu, _ = self.enc_true_mu(src, lengths)
-        true_mu_dist = [self.true_mu(hiddens_mu[i]) for i in range(0, len(hiddens_mu))]
-
-        hiddens_logvar, _ = self.enc_true_logvar(src, lengths)
-        true_logvar_dist = [self.true_logvar(hiddens_logvar[i]) for i in range(0, len(hiddens_logvar))]
-
+        hiddens, _ = self.enc_true(src, lengths)
+        true_mu_dist = [self.true_mu(hiddens[i]) for i in range(0, len(hiddens))]
+        true_logvar_dist = [self.true_logvar(hiddens[i]) for i in range(0, len(hiddens))]
         z_true = self.sampling(true_mu_dist, true_logvar_dist)
         return z_true
 

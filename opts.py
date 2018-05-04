@@ -161,9 +161,9 @@ def preprocess_opts(parser):
                        help="Path to an existing target vocabulary")
     group.add_argument('-features_vocabs_prefix', type=str, default='',
                        help="Path prefix to existing features vocabularies")
-    group.add_argument('-src_vocab_size', type=int, default=50000,
+    group.add_argument('-src_vocab_size', type=int, default=24000,
                        help="Size of the source vocabulary")
-    group.add_argument('-tgt_vocab_size', type=int, default=45000,
+    group.add_argument('-tgt_vocab_size', type=int, default=17000,
                        help="Size of the target vocabulary")
 
     group.add_argument('-src_words_min_frequency', type=int, default=0)
